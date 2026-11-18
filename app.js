@@ -25,7 +25,7 @@ const nextCod = () => 'R-' + String(items.reduce((m, r) => Math.max(m, parseInt(
 
 /* ===== Store: local por defecto, Firestore si hay FIREBASE_CONFIG ===== */
 const Store = (() => {
-  if (typeof firebase !== 'undefined' && window.FIREBASE_CONFIG) {
+  if (typeof firebase !== 'undefined' && typeof FIREBASE_CONFIG !== 'undefined') {
     firebase.initializeApp(FIREBASE_CONFIG);
     const fs = firebase.firestore(), c = fs.collection('retales'), z = fs.collection('config').doc('zonas');
     const fail = e => alert('No se pudo guardar: ' + e.message);

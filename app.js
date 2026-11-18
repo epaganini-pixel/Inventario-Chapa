@@ -34,6 +34,7 @@ const Store = (() => {
     const fs = firebase.firestore(), c = fs.collection('retales'), z = fs.collection('config').doc('zonas');
     const fail = e => alert('No se pudo guardar: ' + e.message);
     return {
+      modo: 'nube',
       save: r => c.doc(r.id).set(r).catch(fail),
       zonas: l => z.set({ l }).catch(fail),
       listen(a, b) {
@@ -47,6 +48,7 @@ const Store = (() => {
   const put = () => { try { localStorage.setItem(KEY, JSON.stringify(d)); } catch (e) { alert('No se pudo guardar en este navegador.'); } };
   let A, B;
   return {
+    modo: 'local',
     save(r) { const i = d.items.findIndex(x => x.id === r.id); i < 0 ? d.items.push(r) : d.items[i] = r; put(); A(d.items); },
     zonas(l) { d.zonas = l; put(); B(l); },
     listen(a, b) { A = a; B = b; a(d.items); b(d.zonas); }
@@ -176,7 +178,7 @@ const Nuevo = {
       if (items.some(x => x.cod === cod)) { err.textContent = `Ya existe ${cod}. Elegí otro número.`; return; }
       const r = { id: uid(), cod, estado: 'Disponible', material: this.v.material, espesor: +f.espesor.value,
         largo: Math.max(l, a), ancho: Math.min(l, a), job: '', zona: this.v.zona, fecha: new Date().toISOString().slice(0, 10), t: Date.now() };
-      d.close(); Store.save(r); toast(`${r.cod} guardado en ${r.zona}. Anotalo en la chapa.`);
+      d.close(); Store.save(r); toast(`${r.cod} guardado en ${r.zona}. Anotalo en la chapa.` + (Store.modo === 'local' ? ' (SOLO en este equipo)' : ''));
     });
   }
 };
@@ -273,6 +275,7 @@ const ZonasDlg = {
 
 /* ===== Arranque ===== */
 Board.init(); Nuevo.init(); Detail.init(); Resumen.init(); ZonasDlg.init();
+{ const m = $('#modo'), n = Store.modo === 'nube'; m.textContent = n ? '● Compartido con todos (Firestore)' : '● Solo en este equipo: falta conectar Firestore'; m.classList.add(n ? 'ok' : 'bad'); }
 Store.listen(
   list => { items = [...list].sort((a, b) => (a.t || 0) - (b.t || 0)); Board.render(); if ($('#detail').open) Detail.render(); },
   list => { zonas = list; Board.render(); if ($('#zonas').open) ZonasDlg.render(); }

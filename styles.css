@@ -71,3 +71,9 @@ h3.sec{margin:6px 0 0;font-size:12px;color:var(--muted);text-transform:uppercase
 #toast.on{opacity:1}
 @media(max-width:620px){body{padding:14px}.row2{grid-template-columns:1fr}}
 @media(prefers-reduced-motion:reduce){#toast{transition:none}}
+
+.zrow{display:grid;grid-template-columns:1fr auto auto;gap:8px;align-items:center}
+.zrow input:only-child{grid-column:1}
+.nombre{display:flex;align-items:center;gap:6px}
+.pre{font-size:22px;font-weight:600;color:var(--text)}
+.nombre input{width:130px;font-size:22px;font-weight:600}

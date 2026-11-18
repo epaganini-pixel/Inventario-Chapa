@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Scrap de chapa</title>
+<link rel="icon" href="logo.png">
+<link rel="stylesheet" href="styles.css?v=1">
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <div class="header-brand">
+      <div class="logo-badge"><img src="logo.png" alt="Axion Lift" onerror="this.parentNode.style.display='none'"></div>
+      <div class="title-block">
+        <h1>Scrap de chapa</h1>
+        <div class="sub">Retales de corte láser y plasma: qué hay y dónde está</div>
+      </div>
+    </div>
+    <div class="hbtns"><button id="bResumen">Resumen</button><button id="bZona">＋ Zona</button></div>
+  </header>
+  <div class="toolbar">
+    <button id="nuevo" class="primary big">＋ Terminé un corte: cargar retal</button>
+    <label>Espesor<select id="fEsp"></select></label>
+    <label>Necesito largo<input id="fL" class="sm" type="number" inputmode="numeric" min="1" placeholder="mm"></label>
+    <label>Necesito ancho<input id="fA" class="sm" type="number" inputmode="numeric" min="1" placeholder="mm"></label>
+  </div>
+  <nav id="chips" class="chips" aria-label="Filtrar por material"></nav>
+  <main id="board" class="board"></main>
+</div>
+<dialog id="nuevo-d"></dialog>
+<dialog id="detail"></dialog>
+<dialog id="resumen"></dialog>
+<div id="toast" role="status"></div>
+
+<!-- Para compartir los datos entre equipos: creá firebase-config.js con
+     const FIREBASE_CONFIG = {...}; y descomentá estas 3 líneas.
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script src="firebase-config.js"></script>
+-->
+<script src="app.js?v=1"></script>
+</body>
+</html>

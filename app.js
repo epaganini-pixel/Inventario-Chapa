@@ -191,12 +191,8 @@ const Detail = {
       <div class="med mono big">${r.largo} × ${r.ancho} mm</div>
       <div class="drow"><span class="badge">${esc(r.material)}</span><span>${fmt(r.espesor)} mm</span><span>${fmt(kg(r))} kg</span></div>
       <div class="drow"><span>Zona: <b>${esc(r.zona || SIN)}</b></span>${r.job ? `<span>Origen: ${esc(r.job)}</span>` : ''}${r.padre ? `<span>De ${esc(r.padre)}</span>` : ''}</div>`;
-    if (this.mode === 'use') h += `<form id="fUse" class="box" style="padding:0"><h3 class="sec">Usar este retal</h3>
-        <label>Job donde se usa<input name="job" required></label>
-        <h3 class="sec">Si sobró otra pieza, cargá sus medidas</h3>
-        <div class="row2"><label>Largo (mm)<input name="largo" type="number" min="1" inputmode="numeric"></label><label>Ancho (mm)<input name="ancho" type="number" min="1" inputmode="numeric"></label></div>
-        <div class="fld">Nombre del retal nuevo<div class="nombre"><span class="mono pre">R-${letra(r.material)}-</span><input name="num" class="mono" type="text" inputmode="numeric" pattern="\\d+" aria-label="Número del retal nuevo" value="${pad(nextNum(r.material))}"></div></div>
-        <div class="actions"><button type="button" data-a="back">Volver</button><button class="primary big">Marcar como usado</button></div></form>`;
+    if (this.mode === 'use') h += `<h3 class="sec">¿Usar este retal?</h3><p class="hint">Se saca del inventario. El nombre ${esc(r.cod)} no se vuelve a usar.</p>
+        <div class="actions"><button data-a="back">Cancelar</button><button class="primary big" data-a="usar">Sí, usarlo</button></div>`;
     else if (this.mode === 'dis') h += `<h3 class="sec">Motivo del descarte</h3>${pick('motivo', MOTIVOS)}
         <div class="actions"><button type="button" data-a="back">Volver</button></div>`;
     else h += `<h3 class="sec">Mover a</h3>${pick('mover', zonas, r.zona)}
@@ -216,19 +212,7 @@ const Detail = {
       if (a === 'close') d.close();
       else if (a === 'use' || a === 'dis') { this.mode = a; this.render(); }
       else if (a === 'back') { this.mode = ''; this.render(); }
-    });
-    d.addEventListener('submit', ev => {
-      if (ev.target.id !== 'fUse') return;
-      ev.preventDefault(); const f = ev.target.elements, r = find(this.id);
-      const l = +f.largo.value, a = +f.ancho.value, hijo = l > 0 && a > 0, cod = nombre(r.material, f.num.value || nextNum(r.material));
-      if (hijo && items.some(x => x.cod === cod)) { toast(`Ya existe ${cod}. Cambiá el número.`); return; }
-      r.estado = 'Usado'; r.usoJob = f.job.value.trim(); r.fechaCierre = Date.now(); Store.save(r);
-      if (hijo) {
-        const n = { id: uid(), cod, estado: 'Disponible', material: r.material, espesor: r.espesor, largo: Math.max(l, a), ancho: Math.min(l, a),
-          job: r.usoJob, zona: r.zona, padre: r.cod, fecha: new Date().toISOString().slice(0, 10), t: Date.now() };
-        Store.save(n); toast(`${r.cod} usado. Nuevo retal ${n.cod} en ${n.zona}.`);
-      } else toast(`${r.cod} marcado como usado`);
-      d.close();
+      else if (a === 'usar') { r.estado = 'Usado'; r.fechaCierre = Date.now(); Store.save(r); toast(`${r.cod} usado y sacado del inventario`); d.close(); }
     });
   }
 };

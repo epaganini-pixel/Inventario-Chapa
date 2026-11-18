@@ -16,7 +16,7 @@ const kg = r => r.largo * r.ancho * r.espesor * dens(r.material) / 1e6;
 const toast = t => { const e = $('#toast'); e.textContent = t; e.classList.add('on'); clearTimeout(toast.t); toast.t = setTimeout(() => e.classList.remove('on'), 2600); };
 
 let items = [], zonas = [...ZONAS0];
-const filters = { mat: 'Todos', esp: '', l: '', a: '' };
+const filters = { mat: 'Todos', esp: '', l: '', a: '', q: '' };
 const find = id => items.find(r => r.id === id);
 const mats = () => [...new Set([...MATERIALES, ...items.map(r => r.material)])];
 const esps = () => [...new Set(items.map(r => r.espesor))].sort((a, b) => a - b);
@@ -58,7 +58,9 @@ const fits = r => {
   const l = +filters.l, a = +filters.a;
   return !(l > 0 && a > 0) || (r.largo >= l && r.ancho >= a) || (r.largo >= a && r.ancho >= l);
 };
-const visible = r => r.estado === 'Disponible' && (filters.mat === 'Todos' || r.material === filters.mat)
+const norm = s => String(s ?? '').toLowerCase().replace(/[^a-z0-9]/g, '');
+const hit = r => { const q = norm(filters.q); return !q || norm([r.cod, r.material, r.zona, r.largo + 'x' + r.ancho, r.job].join(' ')).includes(q); };
+const visible = r => r.estado === 'Disponible' && hit(r) && (filters.mat === 'Todos' || r.material === filters.mat)
   && (!filters.esp || r.espesor === +filters.esp) && fits(r);
 
 const Board = {
@@ -115,6 +117,7 @@ const Board = {
     $('#fEsp').addEventListener('change', e => { filters.esp = e.target.value; this.render(); });
     $('#fL').addEventListener('input', e => { filters.l = e.target.value; this.render(); });
     $('#fA').addEventListener('input', e => { filters.a = e.target.value; this.render(); });
+    $('#q').addEventListener('input', e => { filters.q = e.target.value; this.render(); });
     $('#nuevo').addEventListener('click', () => Nuevo.open());
     $('#bResumen').addEventListener('click', () => Resumen.open());
     $('#bZona').addEventListener('click', () => ZonasDlg.open());
@@ -139,7 +142,14 @@ const Nuevo = {
       <div class="fld">Dónde lo dejás${pick('zona', zonas, this.v.zona)}</div>
       <p class="err" id="nErr"></p>
       <div class="actions"><button type="button" data-a="cancel">Cancelar</button><button class="primary big">Guardar retal</button></div></form>`;
-    $('#nuevo-d').showModal();
+    $('#nuevo-d').showModal(); this.dup();
+  },
+  dup() {
+    const d = $('#nuevo-d'), n = d.querySelector('[name=num]').value, btn = d.querySelector('.actions .primary');
+    const c = this.v.material && /^\d+$/.test(n) ? nombre(this.v.material, n) : '';
+    const rep = !!c && items.some(x => x.cod === c);
+    $('#nErr').textContent = rep ? `${c} ya existe. Elegí otro número.` : '';
+    btn.disabled = rep;
   },
   init() {
     const d = $('#nuevo-d');
@@ -152,10 +162,11 @@ const Nuevo = {
       if (k === 'material') {
         $('#cL').textContent = letra(v);
         if (!this.v.edited) d.querySelector('[name=num]').value = pad(nextNum(v));
+        this.dup();
       }
       b.parentNode.querySelectorAll('button').forEach(x => x.classList.toggle('on', x === b));
     });
-    d.addEventListener('input', e => { if (e.target.name === 'num') this.v.edited = true; });
+    d.addEventListener('input', e => { if (e.target.name === 'num') { this.v.edited = true; this.dup(); } });
     d.addEventListener('submit', ev => {
       ev.preventDefault(); const f = ev.target.elements, err = $('#nErr');
       if (!this.v.material) { err.textContent = 'Elegí el material.'; return; }

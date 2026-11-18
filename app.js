@@ -1,6 +1,6 @@
 'use strict';
 /* ===== Datos y utilidades ===== */
-const MATERIALES = ['Mild Steel', 'Inox', 'Aluminio', 'Galvanizada'];
+const MATERIALES = ['DOMEX', 'MLC', 'F00'];
 const MOTIVOS = ['Muy chico', 'Deformado', 'Oxidado', 'Forma irregular', 'Otro'];
 const ZONAS0 = ['Rack A', 'Rack B', 'Piso'];
 const SIN = 'Sin ubicar';
@@ -21,7 +21,11 @@ const find = id => items.find(r => r.id === id);
 const mats = () => [...new Set([...MATERIALES, ...items.map(r => r.material)])];
 const esps = () => [...new Set(items.map(r => r.espesor))].sort((a, b) => a - b);
 const matColor = m => COLORS[mats().indexOf(m) % COLORS.length];
-const nextCod = () => 'R-' + String(items.reduce((m, r) => Math.max(m, parseInt(r.cod.slice(2)) || 0), 0) + 1).padStart(4, '0');
+const LETRA = { DOMEX: 'D', MLC: 'M', F00: 'F' };
+const letra = m => LETRA[m] || (m || '?')[0].toUpperCase();
+const pad = n => String(n).padStart(3, '0');
+const nombre = (m, n) => `R-${letra(m)}-${pad(+n)}`;
+const nextNum = m => items.reduce((mx, r) => { const k = String(r.cod).match(/^R-(.)-(\d+)$/); return k && k[1] === letra(m) ? Math.max(mx, +k[2]) : mx; }, 0) + 1;
 
 /* ===== Store: local por defecto, Firestore si hay FIREBASE_CONFIG ===== */
 const Store = (() => {
@@ -113,12 +117,7 @@ const Board = {
     $('#fA').addEventListener('input', e => { filters.a = e.target.value; this.render(); });
     $('#nuevo').addEventListener('click', () => Nuevo.open());
     $('#bResumen').addEventListener('click', () => Resumen.open());
-    $('#bZona').addEventListener('click', () => {
-      const n = (prompt('Nombre de la zona nueva (ej. Rack C, Estante 2):') || '').trim();
-      if (!n) return;
-      if (zonas.some(z => z.toLowerCase() === n.toLowerCase())) { toast('Esa zona ya existe'); return; }
-      Store.zonas([...zonas, n]);
-    });
+    $('#bZona').addEventListener('click', () => ZonasDlg.open());
   }
 };
 
@@ -128,14 +127,15 @@ const Nuevo = {
   v: {},
   open(zona) {
     const last = items[items.length - 1];
-    this.v = { material: last?.material || '', zona: zona || '' };
+    this.v = { material: last?.material || '', zona: zona || '', edited: false };
     $('#nuevo-d').innerHTML = `<form id="fNuevo" class="box"><h2>Nuevo retal</h2>
-      <div class="fld">Material${pick('material', [...mats(), 'Otro…'], this.v.material)}</div>
+      <div class="fld">Material${pick('material', mats(), this.v.material)}</div>
       <div class="row2"><label>Espesor (mm)<input name="espesor" type="number" step="0.01" min="0" inputmode="decimal" required></label>
         <div class="fld">Ya usados${pick('espesor', esps().slice(0, 6).map(String))}</div></div>
       <div class="row2"><label>Largo (mm)<input name="largo" type="number" min="1" inputmode="numeric" required></label>
         <label>Ancho (mm)<input name="ancho" type="number" min="1" inputmode="numeric" required></label></div>
-      <label>Job / anidado (opcional)<input name="job" placeholder="TCO BODY X8 (NOV)-JOB000405"></label>
+      <div class="fld">Nombre del retal<div class="nombre"><span class="mono pre">R-<b id="cL">${letra(this.v.material)}</b>-</span>
+        <input name="num" class="mono" type="text" inputmode="numeric" pattern="\\d+" required aria-label="Número del retal" value="${this.v.material ? pad(nextNum(this.v.material)) : ''}"></div></div>
       <div class="fld">Dónde lo dejás${pick('zona', zonas, this.v.zona)}</div>
       <p class="err" id="nErr"></p>
       <div class="actions"><button type="button" data-a="cancel">Cancelar</button><button class="primary big">Guardar retal</button></div></form>`;
@@ -149,15 +149,22 @@ const Nuevo = {
       const k = b.parentNode.dataset.k; let v = b.dataset.v;
       if (v === 'Otro…') { v = (prompt('Material:') || '').trim(); if (!v) return; }
       if (k === 'espesor') d.querySelector('[name=espesor]').value = v; else this.v[k] = v;
+      if (k === 'material') {
+        $('#cL').textContent = letra(v);
+        if (!this.v.edited) d.querySelector('[name=num]').value = pad(nextNum(v));
+      }
       b.parentNode.querySelectorAll('button').forEach(x => x.classList.toggle('on', x === b));
     });
+    d.addEventListener('input', e => { if (e.target.name === 'num') this.v.edited = true; });
     d.addEventListener('submit', ev => {
       ev.preventDefault(); const f = ev.target.elements, err = $('#nErr');
       if (!this.v.material) { err.textContent = 'Elegí el material.'; return; }
       if (!this.v.zona) { err.textContent = 'Elegí dónde lo dejás.'; return; }
       const l = +f.largo.value, a = +f.ancho.value;
-      const r = { id: uid(), cod: nextCod(), estado: 'Disponible', material: this.v.material, espesor: +f.espesor.value,
-        largo: Math.max(l, a), ancho: Math.min(l, a), job: f.job.value.trim(), zona: this.v.zona, fecha: new Date().toISOString().slice(0, 10), t: Date.now() };
+      const cod = nombre(this.v.material, f.num.value);
+      if (items.some(x => x.cod === cod)) { err.textContent = `Ya existe ${cod}. Elegí otro número.`; return; }
+      const r = { id: uid(), cod, estado: 'Disponible', material: this.v.material, espesor: +f.espesor.value,
+        largo: Math.max(l, a), ancho: Math.min(l, a), job: '', zona: this.v.zona, fecha: new Date().toISOString().slice(0, 10), t: Date.now() };
       d.close(); Store.save(r); toast(`${r.cod} guardado en ${r.zona}. Anotalo en la chapa.`);
     });
   }
@@ -177,6 +184,7 @@ const Detail = {
         <label>Job donde se usa<input name="job" required></label>
         <h3 class="sec">Si sobró otra pieza, cargá sus medidas</h3>
         <div class="row2"><label>Largo (mm)<input name="largo" type="number" min="1" inputmode="numeric"></label><label>Ancho (mm)<input name="ancho" type="number" min="1" inputmode="numeric"></label></div>
+        <div class="fld">Nombre del retal nuevo<div class="nombre"><span class="mono pre">R-${letra(r.material)}-</span><input name="num" class="mono" type="text" inputmode="numeric" pattern="\\d+" aria-label="Número del retal nuevo" value="${pad(nextNum(r.material))}"></div></div>
         <div class="actions"><button type="button" data-a="back">Volver</button><button class="primary big">Marcar como usado</button></div></form>`;
     else if (this.mode === 'dis') h += `<h3 class="sec">Motivo del descarte</h3>${pick('motivo', MOTIVOS)}
         <div class="actions"><button type="button" data-a="back">Volver</button></div>`;
@@ -201,10 +209,11 @@ const Detail = {
     d.addEventListener('submit', ev => {
       if (ev.target.id !== 'fUse') return;
       ev.preventDefault(); const f = ev.target.elements, r = find(this.id);
+      const l = +f.largo.value, a = +f.ancho.value, hijo = l > 0 && a > 0, cod = nombre(r.material, f.num.value || nextNum(r.material));
+      if (hijo && items.some(x => x.cod === cod)) { toast(`Ya existe ${cod}. Cambiá el número.`); return; }
       r.estado = 'Usado'; r.usoJob = f.job.value.trim(); r.fechaCierre = Date.now(); Store.save(r);
-      const l = +f.largo.value, a = +f.ancho.value;
-      if (l > 0 && a > 0) {
-        const n = { id: uid(), cod: nextCod(), estado: 'Disponible', material: r.material, espesor: r.espesor, largo: Math.max(l, a), ancho: Math.min(l, a),
+      if (hijo) {
+        const n = { id: uid(), cod, estado: 'Disponible', material: r.material, espesor: r.espesor, largo: Math.max(l, a), ancho: Math.min(l, a),
           job: r.usoJob, zona: r.zona, padre: r.cod, fecha: new Date().toISOString().slice(0, 10), t: Date.now() };
         Store.save(n); toast(`${r.cod} usado. Nuevo retal ${n.cod} en ${n.zona}.`);
       } else toast(`${r.cod} marcado como usado`);
@@ -224,15 +233,52 @@ const Resumen = {
       ${rows.length ? `<table class="tbl"><tr><th>Material</th><th class="n">Espesor</th><th class="n">Retales</th><th class="n">m²</th><th class="n">kg</th></tr>${rows.map(x =>
         `<tr><td>${esc(x.m)}</td><td class="n">${fmt(x.e)} mm</td><td class="n">${x.n}</td><td class="n">${(Math.round(x.a * 100) / 100).toLocaleString('es-AR')}</td><td class="n">${fmt(x.k)}</td></tr>`).join('')}</table>`
         : '<p class="empty">Todavía no hay retales disponibles.</p>'}
-      <p class="hint">Usados: ${items.filter(r => r.estado === 'Usado').length} · Descartados: ${items.filter(r => r.estado === 'Descartado').length} (${fmt(des)} kg a chatarra). Pesos calculados: acero 7,85 · inox 8,0 · aluminio 2,7 g/cm³.</p></div>`;
+      <p class="hint">Usados: ${items.filter(r => r.estado === 'Usado').length} · Descartados: ${items.filter(r => r.estado === 'Descartado').length} (${fmt(des)} kg a chatarra). Pesos calculados con acero 7,85 g/cm³.</p></div>`;
     $('#resumen').showModal();
   },
   init() { $('#resumen').addEventListener('click', e => { if (e.target.closest('[data-a="close"]')) $('#resumen').close(); }); }
 };
 
+/* ===== Lugares: renombrar, quitar y agregar racks ===== */
+const ZonasDlg = {
+  open() { this.render(); $('#zonas').showModal(); },
+  render() {
+    $('#zonas').innerHTML = `<div class="box"><div class="dhead"><h2>Racks y lugares</h2><button data-a="close" aria-label="Cerrar">✕</button></div>
+      <p class="hint">Cambiá el nombre, quitá o agregá lugares. Si quitás uno, sus retales pasan a "${SIN}".</p>
+      ${zonas.map((z, i) => `<div class="zrow"><input data-i="${i}" value="${esc(z)}" aria-label="Nombre del lugar"><button data-up="${i}" aria-label="Subir"${i ? '' : ' disabled'}>↑</button><button class="danger" data-del="${i}">Quitar</button></div>`).join('')}
+      <div class="zrow"><input id="zNew" placeholder="Nuevo lugar (ej. Rack C, Estante 2)" aria-label="Nuevo lugar"><button class="primary" data-addz>Agregar</button></div></div>`;
+  },
+  rename(i, v) {
+    const old = zonas[i], n = v.trim();
+    if (!n || n === old) { this.render(); return; }
+    if (zonas.some((z, j) => j !== i && z.toLowerCase() === n.toLowerCase())) { toast('Ya existe un lugar con ese nombre'); this.render(); return; }
+    items.filter(r => r.zona === old).forEach(r => { r.zona = n; Store.save(r); });
+    Store.zonas(zonas.map((z, j) => j === i ? n : z));
+  },
+  init() {
+    const d = $('#zonas');
+    d.addEventListener('change', e => { if (e.target.dataset.i !== undefined) this.rename(+e.target.dataset.i, e.target.value); });
+    d.addEventListener('click', e => {
+      const t = e.target.closest('button'); if (!t) return;
+      if (t.dataset.a === 'close') d.close();
+      else if (t.dataset.up !== undefined) { const i = +t.dataset.up, l = [...zonas];[l[i - 1], l[i]] = [l[i], l[i - 1]]; Store.zonas(l); }
+      else if (t.dataset.del !== undefined) {
+        const z = zonas[+t.dataset.del], n = items.filter(r => r.estado === 'Disponible' && r.zona === z).length;
+        if (!n || confirm(`"${z}" tiene ${n} retal${n === 1 ? '' : 'es'}. Si lo quitás, pasan a "${SIN}". ¿Quitar?`)) Store.zonas(zonas.filter(x => x !== z));
+      }
+      else if (t.dataset.addz !== undefined) {
+        const n = $('#zNew').value.trim();
+        if (!n) return;
+        if (zonas.some(z => z.toLowerCase() === n.toLowerCase())) { toast('Ya existe un lugar con ese nombre'); return; }
+        Store.zonas([...zonas, n]);
+      }
+    });
+  }
+};
+
 /* ===== Arranque ===== */
-Board.init(); Nuevo.init(); Detail.init(); Resumen.init();
+Board.init(); Nuevo.init(); Detail.init(); Resumen.init(); ZonasDlg.init();
 Store.listen(
   list => { items = [...list].sort((a, b) => (a.t || 0) - (b.t || 0)); Board.render(); if ($('#detail').open) Detail.render(); },
-  list => { zonas = list; Board.render(); }
+  list => { zonas = list; Board.render(); if ($('#zonas').open) ZonasDlg.render(); }
 );
